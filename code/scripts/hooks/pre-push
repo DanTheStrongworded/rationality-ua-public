@@ -1,0 +1,36 @@
+#!/bin/sh
+# pre-push hook: blocks `git push` from the outer repo when private-book
+# work would be left behind. Normal workflow is: ./publish.sh "message"
+TOP="$(git rev-parse --show-toplevel)"
+SUB="$TOP/books/private"
+
+if [ ! -e "$SUB/.git" ]; then
+  echo "BLOCKED: books/private is not checked out."
+  echo "Run: git submodule update --init"
+  exit 1
+fi
+if [ -n "$(git -C "$SUB" status --porcelain)" ]; then
+  echo "BLOCKED: you have unpublished changes inside books/private."
+  echo "Run from the repo root: ./publish.sh \"what you did\""
+  exit 1
+fi
+SUBBRANCH="$(git config -f "$TOP/.gitmodules" submodule.books/private.branch 2>/dev/null)"
+[ -z "$SUBBRANCH" ] && exit 0
+while read LOCAL_REF LOCAL_SHA REMOTE_REF REMOTE_SHA; do
+  case "$LOCAL_SHA" in 0000000000000000000000000000000000000000) continue;; esac
+  if [ "$REMOTE_SHA" = "0000000000000000000000000000000000000000" ]; then
+    RANGE="$LOCAL_SHA"
+  else
+    RANGE="$REMOTE_SHA..$LOCAL_SHA"
+  fi
+  for C in $(git rev-list "$RANGE" -- 2>/dev/null); do
+    SHA="$(git ls-tree "$C" books/private 2>/dev/null | awk '{print $3}')"
+    [ -z "$SHA" ] && continue
+    if ! git -C "$SUB" merge-base --is-ancestor "$SHA" "origin/$SUBBRANCH" 2>/dev/null; then
+      echo "BLOCKED: this push points at private-book commit $SHA which is not on the server yet."
+      echo "Run from the repo root: ./publish.sh \"what you did\""
+      exit 1
+    fi
+  done
+done
+exit 0
