@@ -7,7 +7,7 @@
 
 ## Як публікувати зміни
 
-Приватна книга лежить у `books/private/` — це звичайна папка, редагуй файли як завжди.
+Приватна книга лежить у `books/private/` — це звичайна папка, можна редагувати файли як завжди.
 
 - Після клонування: `git clone --recurse-submodules https://github.com/DanTheStrongworded/rationality-ua-public.git` (або `git submodule update --init` і `bash code/scripts/install-hooks.sh` у вже склонований)
 - Збереження: `./publish.sh що зробив` — спочатку відправляє приватну книгу, потім усе інше
