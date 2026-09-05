@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="uk">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>changes-presenter</title>
+    <style>
+      :root {
+        --bg: #000;
+        --fg: #e8e8e8;
+        --muted: #888;
+        --red: #ff6b6b;
+        --green: #69f0ae;
+        --accent: #7c9cff;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: var(--bg);
+        color: var(--fg);
+        font-family:
+          ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 15px;
+      }
+      body {
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+      }
+      header {
+        flex: 0 0 auto;
+        height: 3rem;
+        min-height: 3rem;
+        max-height: 3rem;
+        padding: 0 1.25rem;
+        display: flex;
+        align-items: center;
+        border-bottom: 1px solid #1a1a1a;
+      }
+      #path {
+        font-size: 0.9rem;
+        color: var(--accent);
+        line-height: 1.25;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        width: 100%;
+      }
+      main {
+        flex: 1 1 auto;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem 1.25rem 5rem;
+        gap: 1.25rem;
+        max-width: 960px;
+        margin: 0 auto;
+        width: 100%;
+      }
+      .line-block {
+        width: 100%;
+        padding: 0.35rem 0;
+        line-height: 1.55;
+        white-space: pre-wrap;
+        word-break: break-word;
+        color: var(--fg);
+        background: transparent;
+        border: none;
+      }
+      #removedBlock,
+      #addedBlock {
+        color: var(--fg);
+      }
+      .w-same {
+        opacity: 0.9;
+      }
+      .w-del {
+        color: var(--red);
+        text-decoration: line-through;
+        text-decoration-color: rgba(255, 107, 107, 0.45);
+        background: none;
+      }
+      .w-ins {
+        color: var(--green);
+        font-weight: 600;
+        background: none;
+      }
+      footer {
+        flex: 0 0 auto;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 0.45rem 0.65rem;
+        background: linear-gradient(to top, #000 70%, transparent);
+        border-top: 1px solid #141414;
+      }
+      footer label {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        font-size: 0.72rem;
+        color: var(--muted);
+      }
+      #interval {
+        width: 4.5rem;
+        font: inherit;
+        font-size: 0.72rem;
+        padding: 0.2rem 0.35rem;
+        border-radius: 4px;
+        border: 1px solid #333;
+        background: #0a0a0a;
+        color: var(--fg);
+      }
+      #go {
+        font: inherit;
+        font-size: 0.72rem;
+        padding: 0.25rem 0.6rem;
+        border-radius: 4px;
+        border: 1px solid var(--accent);
+        background: transparent;
+        color: var(--accent);
+        cursor: pointer;
+        transition:
+          background 0.12s ease,
+          color 0.12s ease;
+      }
+      #go:hover {
+        background: rgba(124, 156, 255, 0.15);
+      }
+      #go.running {
+        border-color: var(--green);
+        color: var(--green);
+      }
+      #hint {
+        font-size: 0.65rem;
+        color: #555;
+        max-width: 28rem;
+        text-align: center;
+        line-height: 1.35;
+      }
+      #empty {
+        color: var(--muted);
+        text-align: center;
+        padding: 2rem;
+      }
+      #stage {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 2rem;
+        transition:
+          opacity 0.2s ease,
+          transform 0.2s ease;
+        opacity: 1;
+        transform: translateY(0);
+      }
+      #stage.slide-enter {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+      #load {
+        font: inherit;
+        font-size: 0.72rem;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        border: 1px solid #333;
+        background: #0a0a0a;
+        color: var(--muted);
+        cursor: pointer;
+      }
+      #load:hover {
+        color: var(--fg);
+        border-color: #555;
+      }
+      #file {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div id="path">—</div>
+    </header>
+    <main>
+      <div id="empty" hidden>
+        No slides. Run collect-changes.mjs and open via HTTP, or load JSON.
+      </div>
+      <div id="stage" hidden>
+        <div id="removedBlock" class="line-block" aria-label="Removed"></div>
+        <div id="addedBlock" class="line-block" aria-label="Added"></div>
+      </div>
+    </main>
+    <footer>
+      <label
+        >ms
+        <input
+          id="interval"
+          type="number"
+          min="200"
+          step="100"
+          value="2400"
+          inputmode="numeric"
+      /></label>
+      <button type="button" id="go">start</button>
+      <input id="file" type="file" accept="application/json,.json" />
+      <button type="button" id="load" title="Load changes.json from disk">
+        json
+      </button>
+      <span id="hint"
+        >HTTP: <code>node collect-changes.mjs --serve</code> · or load
+        JSON</span
+      >
+    </footer>
+    <script type="module">
+      import { diffWords } from "https://esm.sh/diff@5.2.0";
+
+      const pathEl = document.getElementById("path");
+      const removedBlock = document.getElementById("removedBlock");
+      const addedBlock = document.getElementById("addedBlock");
+      const stage = document.getElementById("stage");
+      const emptyEl = document.getElementById("empty");
+      const intervalInput = document.getElementById("interval");
+      const goBtn = document.getElementById("go");
+      const loadBtn = document.getElementById("load");
+      const fileInput = document.getElementById("file");
+      const hintEl = document.getElementById("hint");
+
+      /** @type {{ path?: string, fileName?: string, removed: string, added: string }[]} */
+      let slides = [];
+
+      function slideTitle(s) {
+        if (s.fileName) return s.fileName;
+        const p = s.path || "";
+        const cut = Math.max(p.lastIndexOf("/"), p.lastIndexOf("\\"));
+        return cut >= 0 ? p.slice(cut + 1) : p;
+      }
+      let idx = 0;
+      let timer = null;
+
+      function escapeHtml(s) {
+        return s
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+
+      /**
+       * Word-level merge: show removed line with intra-line deletions, added with insertions,
+       * using diffWords between the two strings (works well for single-line edits).
+       */
+      function renderWordDiff(removed, added) {
+        const parts = diffWords(removed, added);
+        let removedHtml = "";
+        let addedHtml = "";
+        for (const p of parts) {
+          const v = escapeHtml(p.value);
+          if (p.added) {
+            addedHtml += `<span class="w-ins">${v}</span>`;
+          } else if (p.removed) {
+            removedHtml += `<span class="w-del">${v}</span>`;
+          } else {
+            removedHtml += `<span class="w-same">${v}</span>`;
+            addedHtml += `<span class="w-same">${v}</span>`;
+          }
+        }
+        return { removedHtml, addedHtml };
+      }
+
+      function showSlide(i, animate) {
+        if (!slides.length) return;
+        const s = slides[((i % slides.length) + slides.length) % slides.length];
+        pathEl.textContent = slideTitle(s);
+
+        const r = s.removed ?? "";
+        const a = s.added ?? "";
+        const { removedHtml, addedHtml } = renderWordDiff(r, a);
+        const applyDom = () => {
+          removedBlock.innerHTML =
+            removedHtml || '<span class="w-same">(empty)</span>';
+          addedBlock.innerHTML =
+            addedHtml || '<span class="w-same">(empty)</span>';
+        };
+        if (animate) {
+          stage.classList.add("slide-enter");
+          requestAnimationFrame(() => {
+            applyDom();
+            requestAnimationFrame(() => {
+              stage.classList.remove("slide-enter");
+            });
+          });
+        } else {
+          applyDom();
+        }
+      }
+
+      function stop() {
+        if (timer) {
+          clearInterval(timer);
+          timer = null;
+        }
+        goBtn.textContent = "start";
+        goBtn.classList.remove("running");
+      }
+
+      function start() {
+        if (!slides.length) return;
+        stop();
+        const ms = Math.max(100, Number(intervalInput.value) || 2400);
+        intervalInput.value = String(ms);
+        goBtn.textContent = "stop";
+        goBtn.classList.add("running");
+        timer = setInterval(() => {
+          idx = (idx + 1) % slides.length;
+          showSlide(idx, true);
+        }, ms);
+      }
+
+      goBtn.addEventListener("click", () => {
+        if (timer) stop();
+        else start();
+      });
+
+      function applyPayload(data) {
+        slides = Array.isArray(data.slides) ? data.slides : [];
+        idx = 0;
+        if (!slides.length) {
+          stage.hidden = true;
+          emptyEl.hidden = false;
+          pathEl.textContent = "—";
+          stop();
+          return;
+        }
+        emptyEl.hidden = true;
+        stage.hidden = false;
+        showSlide(0, false);
+      }
+
+      loadBtn.addEventListener("click", () => fileInput.click());
+      fileInput.addEventListener("change", () => {
+        const f = fileInput.files && fileInput.files[0];
+        if (!f) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            const data = JSON.parse(String(reader.result));
+            applyPayload(data);
+            hintEl.textContent = `Loaded ${f.name} (${data.slides?.length ?? 0} slides)`;
+          } catch (e) {
+            hintEl.textContent = "Invalid JSON";
+          }
+          fileInput.value = "";
+        };
+        reader.readAsText(f, "utf-8");
+      });
+
+      try {
+        const res = await fetch("./changes.json", { cache: "no-store" });
+        if (res.ok) {
+          const data = await res.json();
+          applyPayload(data);
+          hintEl.textContent = "Loaded changes.json";
+        } else {
+          throw new Error(String(res.status));
+        }
+      } catch {
+        hintEl.textContent =
+          "Fetch failed — use json button or run with --serve";
+        emptyEl.hidden = false;
+        emptyEl.textContent =
+          "No changes.json over HTTP. Click json to load a file.";
+      }
+    </script>
+  </body>
+</html>
